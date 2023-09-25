@@ -1,0 +1,46 @@
+import pandas as pd
+import torch
+import torch.nn as nn
+from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score
+from sklearn import linear_model, tree, ensemble
+df = pd.read_csv("HeightWeight - Sheet1.csv")
+
+x = df["Age (in months)"]
+y_true = df["50th Percentile Length (in centimeters)"]
+
+y_true = torch.tensor(y_true, dtype=torch.float32).unsqueeze(1)
+x = torch.tensor(x, dtype=torch.float32).unsqueeze(1)
+
+
+kf = KFold(n_splits=5)
+
+
+for train_index, test_index in kf.split(x, y_true):
+    crossval = 0
+    x_train, x_test = x[train_index], x[test_index]
+    y_train, y_test = y_true[train_index], y_true[test_index]
+
+    model = nn.Linear(1, 1)
+
+    loss = nn.MSELoss()
+    optimizer = torch.optim.SGD(model.parameters(), lr=.001)
+
+
+    for epoch in range(1000):
+        y_pred = model(x_train)
+        optimizer.zero_grad()
+        optimizer.step()
+
+    y_pred = model(x_test)
+    epoch_loss = loss(y_pred, y_test)
+    crossval += epoch_loss
+
+print(crossval/5)
+
+for epoch in range(1000):
+    y_pred = model(x)
+    epoch_loss = loss(y_pred, y_true)
+    print(epoch_loss)
+    optimizer.zero_grad()
+    epoch_loss.backward() #propogate error backwards (for each weight) - figures out how much each one contributed to the weight (puts data on each weight)
+    optimizer.step() #make the adjustment to that weight (based on loss)
