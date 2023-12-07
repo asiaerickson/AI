@@ -1,0 +1,78 @@
+import torch
+import torchsummary as torchsummary
+import torchvision
+from torchvision import transforms
+from torch import nn
+
+
+img_dimensions = 224
+batch_size = 32  #batch size don't effect accuracy, only speed
+
+#define the transformations to be applied to the images
+img_transforms = transforms.Compose([
+    transforms.Resize((img_dimensions, img_dimensions)),
+    transforms.ToTensor()
+])
+
+#Load the Dataset
+train_dataset = torchvision.datasets.ImageFolder(
+    root = "/Users/asia/Downloads/train",
+    transform = img_transforms)
+
+#Split the dataset into training and validation sets
+train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [20000, 5000])
+
+#Create trainign and validation dataloaders
+train_dataloader = torch.utils.data.DataLoader(
+    train_dataset,
+    batch_size = batch_size,
+    num_workers = 0,
+    shuffle = True
+)
+
+val_dataloader = torch.utils.data.DataLoader(
+    val_dataset,
+    batch_size = batch_size,
+    num_workers = 0,
+    shuffle = True
+)
+
+model = nn.Sequential(
+    nn.Conv2d(3, 16, kernel_size = 3, padding = 3), #3 coming in, 16 coming out aka in_channels and out_channels (padding typically set to one)
+    nn.ReLU(),
+    nn.MaxPool2d(2, 2), #kernel_size (halves the image ish) and stride (stride of one means hit every pixel)
+    nn.Conv2d(16, 32, kernel_size=3, padding=1),
+    nn.ReLU(),
+    nn.MaxPool2d(2, 2),
+    nn.Conv2d(32, 64, kernel_size=3, padding=1),
+    nn.ReLU(),
+    nn.MaxPool2d(2, 2),
+    nn.Flatten(), #no longer two dimensions, just getting values no longer concered with whos neighbors with what
+    nn.Linear(64 * 28 *28, 512), #second one is out_features
+    nn.ReLU(),
+    nn.Linear(512, 2) #in_features and out out_features
+)
+
+torchsummary.summary(model, (3, img_dimensions, img_dimensions))
+
+optim = torch.optim.Adam(model.parameters(), lr=0.001)
+loss_fn = nn.CrossEntropyLoss()
+
+for epoch in range(10):
+    for batch in train_dataloader:
+        x, y = batch
+        y_hat = model(x)
+        loss = loss_fn(y_hat, y)
+        optim.zero_grad()
+        loss.backward()
+        optim.step()
+    print(f"Epoch {epoch} loss: {loss}")
+    correct = 0
+    total = 0
+    for batch in train_dataloader:
+        x, y = batch
+        y_hat = model(x)
+        _, predicted = torch.max(y_hat.data, 1)
+        total += y.size(0)
+        correct += (predicted == y).sum().item()
+    print(f"Epoch {epoch} accuracy: {correct / total}")
